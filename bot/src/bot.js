@@ -14,7 +14,7 @@ import { notify, notifyStart } from './notify.js';
 import { broadcastUpdate } from './server.js';
 
 const CYCLE_SECONDS = parseInt(process.env.CYCLE_INTERVAL_SECONDS || '60');
-const USE_AI        = !!process.env.ANTHROPIC_API_KEY;
+const USE_AI = !!process.env.GEMINI_API_KEY;
 
 let state      = loadState();
 let prices     = {};
