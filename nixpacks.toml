@@ -1,0 +1,16 @@
+[phases.setup]
+nixPkgs = ["nodejs_20", "npm-9_x"]
+
+[phases.install]
+cmds = [
+  "cd dashboard && npm install",
+  "cd bot && npm install"
+]
+
+[phases.build]
+cmds = [
+  "cd dashboard && npm run build"
+]
+
+[start]
+cmd = "node bot/src/index.js"
