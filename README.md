@@ -201,3 +201,4 @@ This is a paper trading system by default. When switched to LIVE mode, real mone
 - **Trades** — full trade history with signals, reasoning, fees, P&L per trade
 - **Positions** — open positions with live unrealized P&L
 - **Market** — live prices for all tracked coins with 24h stats
+
