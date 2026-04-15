@@ -1,60 +1,87 @@
 /**
- * NEXUS TRADER · State Manager
- * Persists portfolio, trades, and bot state to disk
- * On Railway: uses /data volume mount for persistence
+ * NEXUS TRADER · State Manager v2
+ * Persists portfolio, trades, logs, and bot settings
  */
 
 import fs from 'fs';
 import path from 'path';
 
-const STATE_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH || './data';
+const STATE_DIR  = process.env.RAILWAY_VOLUME_MOUNT_PATH || './data';
 const STATE_FILE = path.join(STATE_DIR, 'state.json');
+const LOG_FILE   = path.join(STATE_DIR, 'botlog.json');
 
 function ensureDir() {
   if (!fs.existsSync(STATE_DIR)) fs.mkdirSync(STATE_DIR, { recursive: true });
 }
 
-const DEFAULT_STATE = {
-  balance: parseFloat(process.env.STARTING_BALANCE || '100'),
-  startingBalance: parseFloat(process.env.STARTING_BALANCE || '100'),
-  portfolio: {},       // { BTC: { qty, avgCost, entryTime } }
-  trades: [],          // last 500 trades
-  cycleCount: 0,
-  totalFeesUSD: 0,
-  peakValue: parseFloat(process.env.STARTING_BALANCE || '100'),
-  mode: process.env.TRADING_MODE || 'PAPER',
-  startedAt: new Date().toISOString(),
-  lastCycleAt: null,
-  status: 'idle',      // idle | running | paused | error
-};
+export function getDefaultState() {
+  return {
+    balance:         parseFloat(process.env.STARTING_BALANCE || '100'),
+    startingBalance: parseFloat(process.env.STARTING_BALANCE || '100'),
+    portfolio:       {},
+    trades:          [],
+    cycleCount:      0,
+    totalFeesUSD:    0,
+    peakValue:       parseFloat(process.env.STARTING_BALANCE || '100'),
+    mode:            process.env.TRADING_MODE || 'PAPER',
+    startedAt:       new Date().toISOString(),
+    lastCycleAt:     null,
+    status:          'idle',
+    leverageEnabled: process.env.LEVERAGE_ENABLED === 'true',
+    maxLeverage:     parseInt(process.env.MAX_LEVERAGE || '5'),
+  };
+}
 
 export function loadState() {
   ensureDir();
   try {
     if (fs.existsSync(STATE_FILE)) {
-      const raw = fs.readFileSync(STATE_FILE, 'utf8');
-      return { ...DEFAULT_STATE, ...JSON.parse(raw) };
+      return { ...getDefaultState(), ...JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')) };
     }
   } catch (e) {
-    console.error('[State] Failed to load state, using defaults:', e.message);
+    console.error('[State] Load failed, using defaults:', e.message);
   }
-  return { ...DEFAULT_STATE };
+  return getDefaultState();
 }
 
 export function saveState(state) {
   ensureDir();
   try {
-    // Keep only last 500 trades in state file
-    const trimmed = { ...state, trades: state.trades.slice(0, 500) };
-    fs.writeFileSync(STATE_FILE, JSON.stringify(trimmed, null, 2));
+    fs.writeFileSync(STATE_FILE, JSON.stringify({ ...state, trades: state.trades.slice(0, 500) }, null, 2));
   } catch (e) {
-    console.error('[State] Failed to save state:', e.message);
+    console.error('[State] Save failed:', e.message);
   }
 }
 
-export function resetState() {
+// ── Bot log (separate from trades) ────────────────────────────────────────────
+let memLog = [];
+
+export function appendLog(entry) {
+  memLog.unshift(entry);
+  if (memLog.length > 300) memLog.pop();
+  // Persist occasionally
+  if (memLog.length % 10 === 0) {
+    ensureDir();
+    try { fs.writeFileSync(LOG_FILE, JSON.stringify(memLog, null, 2)); } catch {}
+  }
+}
+
+export function getLog() { return memLog; }
+
+export function loadLog() {
   ensureDir();
-  const fresh = { ...DEFAULT_STATE, startedAt: new Date().toISOString() };
+  try {
+    if (fs.existsSync(LOG_FILE)) {
+      memLog = JSON.parse(fs.readFileSync(LOG_FILE, 'utf8'));
+    }
+  } catch {}
+  return memLog;
+}
+
+export function resetState() {
+  const fresh = getDefaultState();
+  fresh.startedAt = new Date().toISOString();
   saveState(fresh);
+  memLog = [];
   return fresh;
 }

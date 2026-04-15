@@ -1,7 +1,6 @@
 /**
- * NEXUS TRADER · Dashboard Server
- * Express HTTP + WebSocket server
- * Serves the React dashboard and provides real-time data via WebSocket
+ * NEXUS TRADER · Server v2
+ * Express + WebSocket with full control API
  */
 
 import express from 'express';
@@ -12,8 +11,8 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORT = process.env.PORT || 3000;
-const SECRET = process.env.DASHBOARD_SECRET || 'nexus-default-secret';
+const PORT   = process.env.PORT || 3000;
+const SECRET = process.env.DASHBOARD_SECRET || 'nexus-secret';
 
 const app  = express();
 const http = createServer(app);
@@ -21,83 +20,73 @@ const wss  = new WebSocketServer({ server: http });
 
 app.use(express.json());
 
-// Serve built dashboard
 const dashPath = path.join(__dirname, '../../dashboard/dist');
 app.use(express.static(dashPath));
 
-// ── REST API ────────────────────────────────────────────────────────────────
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', ts: new Date().toISOString() });
-});
+let botModule = null;
+export function setBotModule(mod) { botModule = mod; }
 
-app.get('/api/state', async (req, res) => {
-  try {
-    const { getState, getPrices } = await import('./bot.js');
-    res.json({ state: getState(), prices: getPrices() });
-  } catch {
-    res.json({ state: {}, prices: {} });
-  }
+// ── REST API ────────────────────────────────────────────────────────────────
+app.get('/api/health', (_, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
+
+app.get('/api/state', (_, res) => {
+  if (!botModule) return res.json({ state: {}, prices: {}, botLog: [] });
+  res.json({ state: botModule.getState(), prices: botModule.getPrices(), botLog: botModule.getBotLog() });
 });
 
 app.post('/api/control', (req, res) => {
-  const { action, secret } = req.body;
+  const { action, secret, value, maxLeverage } = req.body;
   if (secret !== SECRET) return res.status(401).json({ error: 'Unauthorized' });
-  if (!botModule) return res.status(503).json({ error: 'Bot not initialized' });
+  if (!botModule) return res.status(503).json({ error: 'Bot not ready' });
 
-  if (action === 'start')  { botModule.startBot();  res.json({ ok: true, action: 'started' }); }
-  else if (action === 'stop')  { botModule.stopBot();  res.json({ ok: true, action: 'stopped' }); }
-  else if (action === 'reset') { botModule.forceReset(); res.json({ ok: true, action: 'reset' }); }
-  else res.status(400).json({ error: 'Unknown action' });
+  switch (action) {
+    case 'start':    botModule.startBot();                        return res.json({ ok: true, action: 'started' });
+    case 'stop':     botModule.stopBot();                         return res.json({ ok: true, action: 'stopped' });
+    case 'reset':    botModule.forceReset();                      return res.json({ ok: true, action: 'reset' });
+    case 'run_once': botModule.runOnce();                         return res.json({ ok: true, action: 'run_once' });
+    case 'leverage': botModule.toggleLeverage(!!value, maxLeverage); return res.json({ ok: true, action: 'leverage', value: !!value });
+    default:         return res.status(400).json({ error: 'Unknown action' });
+  }
 });
 
-// Fallback to dashboard for SPA routing
-app.get('*', (req, res) => {
-  const index = path.join(dashPath, 'index.html');
-  if (fs.existsSync(index)) res.sendFile(index);
-  else res.json({ status: 'Dashboard not built yet. Run: cd dashboard && npm run build' });
+app.get('*', (_, res) => {
+  const idx = path.join(dashPath, 'index.html');
+  if (fs.existsSync(idx)) res.sendFile(idx);
+  else res.json({ status: 'Dashboard not built' });
 });
 
 // ── WebSocket ────────────────────────────────────────────────────────────────
 const clients = new Set();
 
-// Bot module reference — set after bot starts
-let botModule = null;
-export function setBotModule(mod) { botModule = mod; }
-
 wss.on('connection', (ws) => {
   clients.add(ws);
-  console.log(`[WS] Client connected. Total: ${clients.size}`);
-
-  // Send current state immediately on connect
-  if (botModule && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({
-      type: 'INIT',
-      state: botModule.getState(),
-      prices: botModule.getPrices(),
-      lastUpdated: new Date().toISOString(),
-    }));
+  // Send current state on connect
+  if (botModule) {
+    try {
+      ws.send(JSON.stringify({
+        type: 'INIT',
+        state: botModule.getState(),
+        prices: botModule.getPrices(),
+        botLog: botModule.getBotLog(),
+        lastUpdated: new Date().toISOString(),
+      }));
+    } catch {}
   }
-
-  ws.on('close', () => {
-    clients.delete(ws);
-    console.log(`[WS] Client disconnected. Total: ${clients.size}`);
-  });
-
+  ws.on('close', () => clients.delete(ws));
   ws.on('error', () => clients.delete(ws));
 });
 
 export function broadcastUpdate(data) {
   const msg = JSON.stringify({ type: 'UPDATE', ...data });
-  for (const client of clients) {
-    if (client.readyState === WebSocket.OPEN) {
-      try { client.send(msg); } catch {}
+  for (const ws of clients) {
+    if (ws.readyState === WebSocket.OPEN) {
+      try { ws.send(msg); } catch {}
     }
   }
 }
 
 export function startServer() {
   http.listen(PORT, () => {
-    console.log(`[Server] Dashboard running on http://localhost:${PORT}`);
-    console.log(`[Server] WebSocket ready on ws://localhost:${PORT}`);
+    console.log(`[Server] http://localhost:${PORT}`);
   });
 }

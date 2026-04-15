@@ -2,7 +2,10 @@
   "name": "nexus-trader",
   "version": "1.0.0",
   "private": true,
-  "workspaces": ["bot", "dashboard"],
+  "workspaces": [
+    "bot",
+    "dashboard"
+  ],
   "scripts": {
     "dev": "concurrently \"npm run dev --workspace=bot\" \"npm run dev --workspace=dashboard\"",
     "build": "npm run build --workspace=dashboard",
@@ -10,5 +13,8 @@
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "@coinbase/cdp-sdk": "^1.47.0"
   }
 }
