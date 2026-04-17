@@ -24,3 +24,4 @@ RUN mkdir -p /app/data
 EXPOSE 3000
 ENV NODE_ENV=production
 CMD ["node", "bot/src/index.js"]
+# cache-bust Thu Apr 16 23:44:23 CDT 2026
