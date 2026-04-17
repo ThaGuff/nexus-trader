@@ -35,7 +35,7 @@ app.get('/api/state', (_, res) => {
 });
 
 app.post('/api/control', (req, res) => {
-  const { action, secret, value, maxLeverage } = req.body;
+  const { action, secret, value, maxLeverage, maxTradeUSD, stopLossPct, takeProfitPct, maxDrawdownPct, leverageEnabled } = req.body;
   if (secret !== SECRET) return res.status(401).json({ error: 'Unauthorized' });
   if (!botModule) return res.status(503).json({ error: 'Bot not ready' });
 
@@ -44,7 +44,8 @@ app.post('/api/control', (req, res) => {
     case 'stop':     botModule.stopBot();                         return res.json({ ok: true, action: 'stopped' });
     case 'reset':    botModule.forceReset();                      return res.json({ ok: true, action: 'reset' });
     case 'run_once': botModule.runOnce();                         return res.json({ ok: true, action: 'run_once' });
-    case 'leverage': botModule.toggleLeverage(!!value, maxLeverage); return res.json({ ok: true, action: 'leverage', value: !!value });
+    case 'leverage':  botModule.toggleLeverage(!!value, maxLeverage); return res.json({ ok: true, action: 'leverage', value: !!value });
+    case 'settings':  botModule.updateSettings({ maxTradeUSD, stopLossPct, takeProfitPct, maxDrawdownPct, leverageEnabled, maxLeverage }); return res.json({ ok: true, action: 'settings' });
     default:         return res.status(400).json({ error: 'Unknown action' });
   }
 });

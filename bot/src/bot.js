@@ -256,3 +256,18 @@ export function runOnce() {
 export function getState()  { return state; }
 export function getPrices() { return prices; }
 export function getBotLog() { return getLog(); }
+
+export function updateSettings(settings) {
+  const { maxTradeUSD, stopLossPct, takeProfitPct, maxDrawdownPct, leverageEnabled, maxLeverage } = settings;
+  if (maxTradeUSD    != null) process.env.MAX_TRADE_USD     = String(Math.max(5,   Math.min(10000, Number(maxTradeUSD))));
+  if (stopLossPct    != null) process.env.STOP_LOSS_PCT     = String(Math.max(0.005, Math.min(0.5, Number(stopLossPct))));
+  if (takeProfitPct  != null) process.env.TAKE_PROFIT_PCT   = String(Math.max(0.01,  Math.min(1.0, Number(takeProfitPct))));
+  if (maxDrawdownPct != null) process.env.MAX_DRAWDOWN_PCT  = String(Math.max(0.05,  Math.min(0.5, Number(maxDrawdownPct))));
+  if (leverageEnabled!= null) process.env.LEVERAGE_ENABLED  = leverageEnabled ? 'true' : 'false';
+  if (maxLeverage    != null) process.env.MAX_LEVERAGE       = String(Math.max(2, Math.min(20, Number(maxLeverage))));
+  state.leverageEnabled = leverageEnabled ?? state.leverageEnabled;
+  state.maxLeverage     = maxLeverage     ?? state.maxLeverage;
+  log(`Settings updated: maxTrade=$${process.env.MAX_TRADE_USD} stopLoss=${process.env.STOP_LOSS_PCT} takeProfit=${process.env.TAKE_PROFIT_PCT}`, 'SYSTEM');
+  saveState(state);
+  broadcast();
+}
