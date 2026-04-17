@@ -35,67 +35,17 @@ function Section({title,right,children}){ return <div style={{background:C.card,
 // ── Settings Panel ────────────────────────────────────────────────────────────
 function SettingsPanel({state,onClose,onSave}){
   const SECRET = import.meta.env.VITE_DASHBOARD_SECRET || 'nexus-secret-2024';
+  // Load current settings from state — shows what's actually active
+  const s = state?.settings || {};
+  // form initialized from state.settings when panel opens
   const [form,setForm] = useState({
-    maxTradeUSD:    20,
-    stopLossPct:    5,
-    takeProfitPct:  8,
-    maxDrawdownPct: 20,
-    cycleSeconds:   60,
-    leverageEnabled:false,
-    maxLeverage:    3,
+    maxTradeUSD:    s.maxTradeUSD    || 20,
+    stopLossPct:    Math.round((s.stopLossPct    || 0.05) * 1000) / 10,
+    takeProfitPct:  Math.round((s.takeProfitPct  || 0.08) * 1000) / 10,
+    maxDrawdownPct: Math.round((s.maxDrawdownPct || 0.20) * 1000) / 10,
+    leverageEnabled: s.leverageEnabled || false,
+    maxLeverage:    s.maxLeverage    || 3,
   });
-  const [saving,setSaving]=useState(false);
-  const [err,setErr]=useState('');
-  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
-  const inp={background:'#030508',border:`1px solid ${C.border2}`,borderRadius:7,padding:'9px 12px',color:C.text,fontFamily:"'JetBrains Mono',monospace",fontSize:13,width:'100%',outline:'none',boxSizing:'border-box'};
-
-  async function save(){
-    setSaving(true);setErr('');
-    try{
-      const res = await fetch('/api/control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-        action:'settings',secret:SECRET,
-        maxTradeUSD:Number(form.maxTradeUSD),
-        stopLossPct:Number(form.stopLossPct)/100,
-        takeProfitPct:Number(form.takeProfitPct)/100,
-        maxDrawdownPct:Number(form.maxDrawdownPct)/100,
-        leverageEnabled:form.leverageEnabled,
-        maxLeverage:Number(form.maxLeverage),
-      })});
-      const d=await res.json();
-      if(!d.ok)throw new Error(d.error||'Save failed');
-      onSave&&onSave();
-      onClose();
-    }catch(e){setErr(e.message);}
-    setSaving(false);
-  }
-
-  return(
-    <div style={{position:'fixed',inset:0,background:'#000000cc',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
-      <div style={{background:C.card2,border:`1px solid ${C.border2}`,borderRadius:14,padding:28,width:'100%',maxWidth:460,maxHeight:'90vh',overflowY:'auto'}}>
-        <div style={{display:'flex',justifyContent:'space-between',marginBottom:22}}><span style={{color:C.text,fontSize:17,fontWeight:800}}>Bot Settings</span><button onClick={onClose} style={{color:C.muted,background:'none',border:'none',cursor:'pointer',fontSize:22,lineHeight:1}}>×</button></div>
-        {err&&<div style={{color:C.red,fontSize:12,marginBottom:14,padding:'9px 12px',background:'#ef444415',borderRadius:7}}>{err}</div>}
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:14}}>
-          {[['Max Trade ($)','maxTradeUSD',5,10000],['Stop Loss (%)','stopLossPct',0.5,50],['Take Profit (%)','takeProfitPct',1,100],['Max Drawdown (%)','maxDrawdownPct',5,50]].map(([l,k,mn,mx])=>(
-            <div key={k}><div style={{color:C.muted,fontSize:10,fontWeight:600,marginBottom:6,textTransform:'uppercase',letterSpacing:'0.08em'}}>{l}</div><input type="number" min={mn} max={mx} step="0.5" value={form[k]} onChange={e=>set(k,e.target.value)} style={inp}/></div>
-          ))}
-        </div>
-        <div style={{marginBottom:14}}>
-          <label style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer',padding:'10px',background:'#ffffff05',borderRadius:8}}>
-            <input type="checkbox" checked={form.leverageEnabled} onChange={e=>set('leverageEnabled',e.target.checked)} style={{accentColor:C.purple,width:16,height:16}}/>
-            <span style={{color:C.muted,fontSize:13}}>Enable leverage/perpetuals (requires confidence ≥ 8/10)</span>
-          </label>
-        </div>
-        <div style={{background:'#f59e0b0a',border:'1px solid #f59e0b20',borderRadius:8,padding:'10px 12px',marginBottom:20}}>
-          <p style={{color:'#d97706',fontSize:11,lineHeight:1.6}}>⚠ Settings take effect next cycle. Stop/start bot for immediate effect.</p>
-        </div>
-        <div style={{display:'flex',gap:10}}>
-          <button onClick={save} disabled={saving} style={{flex:1,background:C.green,color:'#000',border:'none',borderRadius:8,padding:'11px',fontWeight:800,fontSize:14,cursor:'pointer'}}>{saving?'Saving...':'Save Settings'}</button>
-          <Btn onClick={onClose}>Cancel</Btn>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ── Main App ──────────────────────────────────────────────────────────────────
 export default function App(){

@@ -18,7 +18,10 @@ export function useTraderSocket() {
     try {
       const ws = new WebSocket(WS_URL);
       wsRef.current = ws;
-      ws.onopen  = () => { setConnected(true); if (reconnectRef.current) { clearTimeout(reconnectRef.current); reconnectRef.current = null; } };
+      ws.onopen  = () => {
+        setConnected(true);
+        if (reconnectRef.current) { clearTimeout(reconnectRef.current); reconnectRef.current = null; }
+      };
       ws.onmessage = (e) => {
         try {
           const msg = JSON.parse(e.data);
@@ -26,6 +29,9 @@ export function useTraderSocket() {
           if (msg.prices)      setPrices(msg.prices);
           if (msg.botLog)      setBotLog(msg.botLog);
           if (msg.lastUpdated) setLastUpdated(msg.lastUpdated);
+          if (msg.type === 'INIT')         { if(msg.state)setState(msg.state); if(msg.prices)setPrices(msg.prices); if(msg.botLog)setBotLog(msg.botLog); }
+          if (msg.type === 'UPDATE')       { if(msg.state)setState(msg.state); if(msg.prices)setPrices(msg.prices); if(msg.botLog)setBotLog(msg.botLog); if(msg.lastUpdated)setLastUpdated(msg.lastUpdated); }
+          if (msg.type === 'PRICES')       setPrices(msg.prices);
         } catch {}
       };
       ws.onclose = () => { setConnected(false); reconnectRef.current = setTimeout(connect, 3000); };
@@ -35,7 +41,7 @@ export function useTraderSocket() {
 
   useEffect(() => {
     connect();
-    return () => { if (wsRef.current) wsRef.current.close(); if (reconnectRef.current) clearTimeout(reconnectRef.current); };
+    return () => { if(wsRef.current)wsRef.current.close(); if(reconnectRef.current)clearTimeout(reconnectRef.current); };
   }, [connect]);
 
   return { connected, state, prices, botLog, lastUpdated };
